@@ -8,8 +8,8 @@ import json
 import random
 import io
 import matplotlib.pyplot as plt
-
-from PIL import Image, ImageDraw, ImageFont
+import matplotlib.ticker as mticker
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from keep_alive import keep_alive
 
 intents = discord.Intents.default()
@@ -232,7 +232,15 @@ async def setchannel(ctx):
 @bot.command()
 async def endwar(ctx):
     state = get_war_state(ctx.guild.id)
+    guild_id = ctx.guild.id
 
+    bg_img = Image.open("/home/container/background.jpg").convert("RGBA")
+    bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=3))
+    
+    # Aumento luminosità dello sfondo
+    enhancer = ImageEnhance.Brightness(bg_img)
+    bg_img = enhancer.enhance(1.05)
+    
     team_tag = state.get('team_tag', "Team A")
     opp_tag  = state.get('opponent_tag', "Team B")
 
@@ -258,55 +266,60 @@ async def endwar(ctx):
     diff = [t - o for t, o in zip(team_cum, opp_cum)]
     races = list(range(1, len(team_scores)+1))
 
-    # === Colori e dimensioni titolo ===
-    team_color = "#FFECB3" if total_team > total_opp else "#6F2C2C"
-    opp_color  = "#FFECB3" if total_opp > total_team else "#6F2C2C"
-
-    team_size = 46 if total_team > total_opp else 28
-    opp_size  = 46 if total_team < total_opp else 28
-
-    team_pos = 1.04 if total_team > total_opp else 1.07
-    opp_pos  = 1.04 if total_team < total_opp else 1.07
-
     # === Crea grafico ===
-    import io
-    from PIL import Image
-
     fig, ax = plt.subplots(figsize=(6,3))
     for spine in ax.spines.values():
         spine.set_visible(False)
-
+    
+    # Impostazione sfondo
+    ax.set_facecolor("none")
+    fig.figimage(bg_img, xo=0, yo=0, alpha=0.8, zorder=-1)
+    
     # Y-ticks: min, max, zero e mediane
     min_diff = int(min(diff))
     max_diff = int(max(diff))
-    mid_low  = int((min_diff + 0) / 2)
-    mid_high = int((max_diff + 0) / 2)
+    mid_low  = int((min_diff + 0) / 2) if min_diff < -20 else 0
+    mid_high = int((max_diff + 0) / 2) if max_diff > 20 else 0
     yticks = sorted(set([min_diff, mid_low, 0, mid_high, max_diff]))
     ax.set_yticks(yticks)
-
-    # Titolo colorato
-    ax.text(0.36, team_pos, team_tag, color=team_color, fontsize=team_size, fontweight="bold",
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+    
+    # Titolo (Team vs Team)
+    ax.text(0.41, 1.05, team_tag, color="#424242", fontsize="32", fontweight="bold",
             ha='right', transform=ax.transAxes)
-    ax.text(0.46, 1.08, " vs ", color="gray", fontsize=18, fontweight="bold",
-            ha='center', transform=ax.transAxes)
-    ax.text(0.56, opp_pos, opp_tag, color=opp_color, fontsize=opp_size, fontweight="bold",
+    ax.text(0.51, 1.05, opp_tag, color="#424242", fontsize="32", fontweight="bold",
             ha='left', transform=ax.transAxes)
+    ax.text(0.46, 1.05, "vs", color="#424242", fontsize="18", fontweight="bold",
+            ha='center', transform=ax.transAxes)
 
     # Linea zero
     ax.axhline(0, color='black', linewidth=1)
+    
+    if max_diff < 20 or min_diff > -20:
+        yticks = [y for y in yticks if y != 0]  # rimuove lo 0
+        ax.set_yticks(yticks)
 
     # Linea differenza
-    ax.plot(races, diff, linewidth=2, color="red", marker='o')
+    ax.plot(races, diff, linewidth=2, color="red")
+    ax.tick_params(axis='both', which='both', length=0)
 
     # Solo linee orizzontali
     ax.grid(axis='y')
-
+    
     # Salva immagine in buffer
     buf = io.BytesIO()
-    plt.savefig(buf, format="PNG", bbox_inches='tight')
+    plt.savefig(buf, format="PNG", bbox_inches='tight', transparent=True)
     plt.close(fig)
     buf.seek(0)
 
+
+    if summary_messages.get(guild_id):
+        try:
+            await summary_messages[guild_id].delete()
+        except discord.NotFound:
+            pass
+    summary_messages[guild_id] = None
+    
     # Manda immagine con embed
     embed.set_image(url="attachment://war_summary.png")
     await ctx.send(embed=embed, file=discord.File(buf, filename="war_summary.png"))
@@ -336,7 +349,7 @@ async def serverlist(ctx):
 async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw):
     state = get_war_state(ctx.guild.id)
     if not state['war_active']:
-        await ctx.send("Was hasn't started yet.")
+        await ctx.send("War hasn't started yet.")
         return
 
     if not (1 <= race_number <= state['total_races']):
@@ -486,12 +499,10 @@ def format_summary_embed(guild_id):
         summary += f"  T: **{draws}**"
     embed.add_field(name="Stats", value=summary, inline=False)
 
-    if state['results']:  # se almeno una gara è stata giocata
+    if state['results'] and state['war_active']:  # se almeno una gara è stata giocata
         last_race = state['results'][-1]
         rec = suggest_tracks(last_race['placements'])
-        
         random.shuffle(rec)
-        
         embed.add_field(
             name="Suggested tracks",
             value=" | ".join(rec),
@@ -570,7 +581,7 @@ async def on_message(message):
                 state['current_track'] = None
                 return
             else:
-                await message.channel.send(f"Use !endwar to end the war and show the final summary.")
+                await endwar(message.channel)
                 return
 
     await bot.process_commands(message)
