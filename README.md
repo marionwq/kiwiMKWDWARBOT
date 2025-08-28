@@ -40,4 +40,4 @@ Additionally:
 
 ## 🚀 Installation
 
-1. Click [here](https://discord.com/oauth2/authorize?client_id=1388648962193494287&permissions=125952&scope=bot) to invite the bot to your own server. The permissions needed are listed in the page right before inviting the bot.
+1. Click [here](https://top.gg/bot/1388648962193494287) to invite the bot to your own server.
