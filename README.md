@@ -30,7 +30,7 @@ It tracks races, calculates scores automatically, applies penalties, and suggest
 | `!addpenalty <team/opponent> <points>` | Add penalty points |
 | `!removepenalty <team/opponent> <points>` | Remove penalty points |
 | `!back` | Cancel the last recorded race |
-| `!editrace <race_number> [track_tag] [placements]` | Edit an existing race. !editrace <race_number> [track_tag] also works and wont change the inserted placements. |
+| `!editrace <race_number> [track_tag] [placements]` | Edit an existing race. `!editrace <race_number>` [track_tag] also works and wont change the inserted placements. |
 | `!endwar` | Finish the war and generate the final summary |
 
 Additionally:  
