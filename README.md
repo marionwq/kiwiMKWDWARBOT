@@ -8,15 +8,16 @@ It tracks races, calculates scores automatically, applies penalties, and suggest
 
 ## ✨ Features
 
-- Start and manage wars with customizable team tags  
-- Record races by simply typing track tags and placements  
-- Automatic score calculation (team vs opponent)  
-- Edit past races (`!editrace`) or go back to the previous one (`!back`)  
-- Apply or remove penalties (`!addpenalty`, `!removepenalty`)  
-- End a war and generate a **final summary embed** with stats and graphs  
-- Track suggestions based on last race results  
-- Multi-server support (each server keeps its own war state)  
-- Persistent war data saved in `state.json`  
+- Start and manage wars with customizable team tags
+- Record races by simply typing track tags and placements
+- Automatic score calculation (team vs opponent)
+- Edit past races (!editrace) or go back to the previous one (!back)
+- Apply or remove penalties (!addpenalty, !removepenalty)
+- End a war and generate a final summary embed with stats and graphs. Background is dependant on last race's track
+- Dynamic embed color that changes from green (positive difference) to red (negative difference)
+- Track suggestions based on last race results
+- Multi-server support (each server keeps its own war state)
+- Persistent war data saved in state.json
 
 ---
 
@@ -29,7 +30,7 @@ It tracks races, calculates scores automatically, applies penalties, and suggest
 | `!addpenalty <team/opponent> <points>` | Add penalty points |
 | `!removepenalty <team/opponent> <points>` | Remove penalty points |
 | `!back` | Cancel the last recorded race |
-| `!editrace <race_number> [track_tag] [placements]` | Edit an existing race |
+| `!editrace <race_number> [track_tag] [placements]` | Edit an existing race. !editrace <race_number> [track_tag] also works and wont change the inserted placements. |
 | `!endwar` | Finish the war and generate the final summary |
 
 Additionally:  
