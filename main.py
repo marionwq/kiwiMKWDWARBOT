@@ -10,7 +10,6 @@ import io
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
-from keep_alive import keep_alive
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -96,6 +95,7 @@ def get_war_state(guild_id):
             'results': [],
             'war_active': False,
             'current_track': None,
+            'tracks': [],
             'team_tag': None,
             'opponent_tag': None,
             'channel_id': None,
@@ -155,6 +155,15 @@ def parse_positions(s):
                 continue
     return sorted(set(result))
 
+def load_track_bg(track_tag):
+    base_path = "tracks_bg"
+    candidates = [f"BG{track_tag}.png", f"BG{track_tag}.jpg"]
+
+    for filename in candidates:
+        filepath = os.path.join(base_path, filename)
+        if os.path.exists(filepath):
+            return Image.open(filepath).convert("RGBA")
+        
 def get_embed_color(diff):
     max_diff = 70  # max differenza per scala colore, puoi regolare
     # clamp diff in -max_diff..+max_diff
@@ -234,12 +243,14 @@ async def endwar(ctx):
     state = get_war_state(ctx.guild.id)
     guild_id = ctx.guild.id
 
-    bg_img = Image.open("/home/container/background.jpg").convert("RGBA")
+    # Ultima pista giocata
+    track_tag = state['results'][-1]['track_tag']
+    bg_img = load_track_bg(track_tag)
     bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=3))
     
     # Aumento luminosità dello sfondo
     enhancer = ImageEnhance.Brightness(bg_img)
-    bg_img = enhancer.enhance(1.05)
+    bg_img = enhancer.enhance(1.08)
     
     team_tag = state.get('team_tag', "Team A")
     opp_tag  = state.get('opponent_tag', "Team B")
@@ -266,16 +277,14 @@ async def endwar(ctx):
     diff = [t - o for t, o in zip(team_cum, opp_cum)]
     races = list(range(1, len(team_scores)+1))
 
-    # === Crea grafico ===
+    # === Crea grafico trasparente ===
     fig, ax = plt.subplots(figsize=(6,3))
     for spine in ax.spines.values():
         spine.set_visible(False)
-    
-    # Impostazione sfondo
     ax.set_facecolor("none")
-    fig.figimage(bg_img, xo=0, yo=0, alpha=0.8, zorder=-1)
-    
-    # Y-ticks: min, max, zero e mediane
+    fig.patch.set_alpha(0)
+
+    # Y-ticks
     min_diff = int(min(diff))
     max_diff = int(max(diff))
     mid_low  = int((min_diff + 0) / 2) if min_diff < -20 else 0
@@ -283,7 +292,7 @@ async def endwar(ctx):
     yticks = sorted(set([min_diff, mid_low, 0, mid_high, max_diff]))
     ax.set_yticks(yticks)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    
+
     # Titolo (Team vs Team)
     ax.text(0.41, 1.05, team_tag, color="#424242", fontsize="32", fontweight="bold",
             ha='right', transform=ax.transAxes)
@@ -296,23 +305,31 @@ async def endwar(ctx):
     ax.axhline(0, color='black', linewidth=1)
     
     if max_diff < 20 or min_diff > -20:
-        yticks = [y for y in yticks if y != 0]  # rimuove lo 0
+        yticks = [y for y in yticks if y != 0]
         ax.set_yticks(yticks)
 
     # Linea differenza
     ax.plot(races, diff, linewidth=2, color="red")
     ax.tick_params(axis='both', which='both', length=0)
-
-    # Solo linee orizzontali
     ax.grid(axis='y')
-    
-    # Salva immagine in buffer
+
+    # Salva grafico trasparente in buffer
     buf = io.BytesIO()
     plt.savefig(buf, format="PNG", bbox_inches='tight', transparent=True)
     plt.close(fig)
     buf.seek(0)
 
+    # Combina grafico trasparente con sfondo
+    graph_img = Image.open(buf).convert("RGBA")
+    bg_resized = bg_img.resize(graph_img.size)
+    final_img = Image.alpha_composite(bg_resized, graph_img)
 
+    # Salva immagine finale in buffer
+    final_buf = io.BytesIO()
+    final_img.save(final_buf, format="PNG")
+    final_buf.seek(0)
+
+    # Cancella vecchio riepilogo
     if summary_messages.get(guild_id):
         try:
             await summary_messages[guild_id].delete()
@@ -320,10 +337,9 @@ async def endwar(ctx):
             pass
     summary_messages[guild_id] = None
     
-    # Manda immagine con embed
+    # Manda immagine finale con embed
     embed.set_image(url="attachment://war_summary.png")
-    await ctx.send(embed=embed, file=discord.File(buf, filename="war_summary.png"))
-
+    await ctx.send(embed=embed, file=discord.File(final_buf, filename="war_summary.png"))
 
 @bot.command()
 async def back(ctx):
@@ -414,6 +430,19 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
 
     state['team_scores'][race_number - 1] = team_points
     state['opponent_scores'][race_number - 1] = opponent_points
+
+    # --- Mantieni sincronizzata la lista tracks ---
+    if 'tracks' not in state:
+        state['tracks'] = []
+
+    if len(state['tracks']) >= race_number:
+        state['tracks'][race_number - 1] = track
+    else:
+        # Se per qualche motivo manca, riempi fino alla gara attuale
+        while len(state['tracks']) < race_number - 1:
+            state['tracks'].append(None)
+        state['tracks'].append(track)
+
     save_war_state()
 
     # --- Aggiorna embed ---
@@ -546,7 +575,7 @@ async def on_message(message):
             placements += missing[:6 - len(placements)]
         placements = sorted(set(placements))
 
-        if len(placements) == 6:
+        if len(placements) == 6:            
             track_tag = state['current_track'] or 'N/A'
             track_name = track_names.get(track_tag, 'Unknown')
             team_set = set(placements)
@@ -565,6 +594,7 @@ async def on_message(message):
                 'opponent_points': opp_pts,
                 'placements': placements
             })
+            state['tracks'].append(track_tag)
             save_war_state()
 
             if summary_messages.get(guild_id):
@@ -587,6 +617,5 @@ async def on_message(message):
     await bot.process_commands(message)
 
 if __name__ == "__main__":
-    keep_alive()
     load_dotenv()
     bot.run(os.getenv("TOKEN"))
