@@ -1,4 +1,6 @@
 import discord
+from pyngrok import ngrok
+from flask import Flask, send_file, request, make_response
 import os
 from threading import Thread
 from dotenv import load_dotenv
@@ -10,7 +12,10 @@ import io
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+import threading
+import base64
 
+app = Flask(__name__)
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
@@ -186,6 +191,103 @@ def get_embed_color(diff):
 
     return discord.Color.from_rgb(red, green, blue)
 
+def generate_overlay_image(state):
+    width, height = 800, 250
+    img = Image.new("RGBA", (width, height), (0,0,0,0))
+    draw = ImageDraw.Draw(img)
+
+    rect_x0, rect_y0 = 10, 10
+    rect_x1, rect_y1 = width - 10, height - 10
+    radius = 25
+
+    shadow = Image.new("RGBA", img.size, (0,0,0,0))
+    shadow_draw = ImageDraw.Draw(shadow)
+    shadow_color = (0, 0, 0, 120)
+    shadow_offset = 3
+    shadow_draw.rounded_rectangle(
+        [rect_x0 + shadow_offset, rect_y0 + shadow_offset, rect_x1 + shadow_offset, rect_y1 + shadow_offset],
+        radius=radius, fill=shadow_color
+    )
+    shadow = shadow.filter(ImageFilter.GaussianBlur(4))
+    img = Image.alpha_composite(img, shadow)
+    draw = ImageDraw.Draw(img)
+    draw.rounded_rectangle([rect_x0, rect_y0, rect_x1, rect_y1], radius=radius, fill=(30,30,30,200))
+
+    team_total = sum(state['team_scores'])
+    opp_total  = sum(state['opponent_scores'])
+    team_tag = state.get('team_tag', "Team A")
+    opp_tag  = state.get('opponent_tag', "Team B")
+    race_number = state.get('current_race', 1)
+    total_races = state.get('total_races', 12)
+
+    font = ImageFont.truetype("Splatoon2.otf", 64)
+    text = f"{team_tag} vs {opp_tag}"
+    bbox = draw.textbbox((0,0), text, font=font) 
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    draw.text(((800 - text_width)//2, 10), text, fill="white", font=font, ha="center", size=32)
+    
+    font = ImageFont.truetype("Splatoon2.otf", 34)
+    text = f"(± {abs(team_total - opp_total)})"
+    bbox = draw.textbbox((0,0), text, font=font) 
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    draw.text(((800 - text_width)//2, 4), text, fill="white", font=font, ha="center", size=32)
+    
+    font = ImageFont.truetype("Splatoon2.otf", 52)
+    draw.text((30, 100), f"{team_total}", fill="#BDBDBD", font=font, ha="right")
+    draw.text((685, 100), f"{opp_total}", fill="#BDBDBD", font=font, ha="left")
+    
+    text = f"{race_number-1}/{total_races}"
+    bbox = draw.textbbox((0,0), text, font=font) 
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    draw.text(((800 - text_width)//2, 120), text, fill="yellow", font=font)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
+from flask import Flask, make_response
+import base64
+
+app = Flask(__name__)
+
+@app.route("/overlay/<int:guild_id>")
+def overlay(guild_id):
+    state = war_states.get(guild_id)
+    if not state:
+        return "No war state for this guild.", 404
+
+    try:
+        img_buf = generate_overlay_image(state)
+        img_b64 = base64.b64encode(img_buf.getvalue()).decode()
+
+        html = f"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta http-equiv="refresh" content="2">
+            <title>Overlay</title>
+            <style>
+                body {{ margin:0; padding:0; background:transparent; }}
+                img {{ width:100%; height:auto; display:block; }}
+            </style>
+        </head>
+        <body>
+            <img src="data:image/png;base64,{img_b64}">
+        </body>
+        </html>
+        """
+
+        response = make_response(html)
+        response.headers["ngrok-skip-browser-warning"] = "true"
+        return response
+
+    except Exception as e:
+        return f"Error generating overlay: {e}", 500
 
 @bot.command()
 async def warstart(ctx, our_team_tag: str = None, opponent_team_tag: str = None):
@@ -237,6 +339,14 @@ async def setchannel(ctx):
     save_war_state()
     await ctx.send(f"Set channel: {ctx.channel.mention}.")
 
+@bot.command()
+async def obs(ctx):
+    guild_id = ctx.guild.id
+    state = war_states.get(guild_id)
+    if not state:
+        await ctx.send("No war active for this server.")
+        return
+    await ctx.send(f"Overlay URL: {public_url}/overlay/{guild_id}")
 
 @bot.command()
 async def endwar(ctx):
@@ -615,6 +725,22 @@ async def on_message(message):
                 return
 
     await bot.process_commands(message)
+
+def run_flask():
+    app.run(host="0.0.0.0", port=13047)  # porta di WispByte
+
+threading.Thread(target=run_flask, daemon=True).start()
+
+
+ngrok.set_auth_token("324Zf8lyqLgA4Q2fRJVvG56HJJ0_4bDfKxk1VogEJi73Pd9Wp")
+tunnel = ngrok.connect(13047, bind_tls=True)
+public_url = tunnel.public_url
+print(f"Overlay URL: {public_url}/overlay/<guild_id>")
+
+@app.after_request
+def skip_ngrok_warning(response):
+    response.headers["ngrok-skip-browser-warning"] = "true"
+    return response
 
 if __name__ == "__main__":
     load_dotenv()
