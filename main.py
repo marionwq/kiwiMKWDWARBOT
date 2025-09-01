@@ -127,37 +127,59 @@ def calculate_points(positions):
     points_table = [15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
     return sum(points_table[pos - 1] for pos in positions if 1 <= pos <= 12)
 
-def parse_positions(s):
+def parse_positions(s: str):
     result = []
+
     tokens = re.split(r"[\s,]+", s.strip())
+
     for token in tokens:
         if '-' in token:
-            try:
-                start, end = map(int, token.split('-'))
-                if 1 <= start <= 12 and 1 <= end <= 12 and start < end:
-                    result.extend(range(start, end + 1))
-                    continue
-            except:
-                pass
-        if re.fullmatch(r"\d+", token):
+            start_str, end_str = token.split('-')
+            start_list = []
+            if int(start_str) > 12:
+                for i, ch in enumerate(start_str):
+                    if start_str[i:i+2] in ["10","11","12"]:
+                        start_list.append(int(start_str[i:i+2]))
+                        break
+                    else:
+                        start_list.append(int(ch))
+            elif start_str == "12":
+                start_list.extend([1,2])
+            else:
+                start_list.append(int(start_str))
+            
+            end_list = []
             i = 0
-            while i < len(token):
-                if token[i:i+2] == "12":
-                    result.extend([1, 2])
-                    i += 2
-                elif token[i:i+2] in ["10", "11"]:
-                    result.append(int(token[i:i+2]))
+            while i < len(end_str):
+                if end_str[i:i+2] in ["10","11","12"]:
+                    end_list.append(int(end_str[i:i+2]))
                     i += 2
                 else:
-                    result.append(int(token[i]))
+                    end_list.append(int(end_str[i]))
                     i += 1
-        else:
-            try:
-                num = int(token)
-                if 1 <= num <= 12:
-                    result.append(num)
-            except:
-                continue
+
+            range_start = start_list[-1]+1
+            range_end = end_list[0]-1
+            if range_start <= range_end:
+                mid_range = list(range(range_start, range_end+1))
+            else:
+                mid_range = []
+
+            result.extend(start_list + mid_range + end_list)
+            continue
+
+        i = 0
+        while i < len(token):
+            if token[i:i+2] == "12":
+                result.extend([1, 2])
+                i += 2
+            elif token[i:i+2] in ["10", "11"]:
+                result.append(int(token[i:i+2]))
+                i += 2
+            else:
+                result.append(int(token[i]))
+                i += 1
+
     return sorted(set(result))
 
 def load_track_bg(track_tag):
@@ -170,8 +192,7 @@ def load_track_bg(track_tag):
             return Image.open(filepath).convert("RGBA")
         
 def get_embed_color(diff):
-    max_diff = 70  # max differenza per scala colore, puoi regolare
-    # clamp diff in -max_diff..+max_diff
+    max_diff = 70  
     diff = max(-max_diff, min(diff, max_diff))
 
     if diff > 0:
