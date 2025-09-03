@@ -12,6 +12,8 @@ import random
 import io
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+
+
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 import threading
 import base64
@@ -25,7 +27,9 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 ERROR_CHANNEL_ID = 1412586731026251826  
 overlay_cache = {}
-
+matplotlib.rcParams["text.usetex"] = False
+matplotlib.rcParams["mathtext.default"] = "regular"
+matplotlib.rcParams["axes.unicode_minus"] = False
 war_states = {}
 summary_messages = {}
 
@@ -153,6 +157,9 @@ def get_war_state(guild_id):
 def save_war_state():
     with open("state.json", "w") as f:
         json.dump(war_states, f)
+
+    for gid, state in war_states.items():
+        generate_overlay_image(state, int(gid))
 
 def load_war_states():
     global war_states
@@ -311,7 +318,8 @@ def generate_overlay_image(state, guild_id):
     img.close()
     shadow.close()
 
-    overlay_cache[guild_id] = buf
+    buf = generate_overlay_image(state, guild_id)
+    overlay_cache[guild_id] = io.BytesIO(buf.getvalue())
 
     return buf
 
@@ -329,7 +337,7 @@ def overlay(guild_id):
 
     try:
         if guild_id in overlay_cache:
-            img_buf = overlay_cache[guild_id]
+            img_buf = io.BytesIO(overlay_cache[guild_id].getvalue())
         else:
             img_buf = generate_overlay_image(state, guild_id) 
 
@@ -379,6 +387,7 @@ async def warstart(ctx, our_team_tag: str = None, opponent_team_tag: str = None)
     })
     summary_messages[ctx.guild.id] = None
     save_war_state()
+    generate_overlay_image(state, ctx.guild.id)
     await ctx.send(f"War started: `{our_team_tag}` vs `{opponent_team_tag}` in {ctx.channel.mention}!")
 
 @bot.command()
@@ -389,6 +398,7 @@ async def addpenalty(ctx, team_tag: str, amount: int):
         return
     state['penalties'][team_tag.lower()] += amount
     save_war_state()
+    generate_overlay_image(state, ctx.guild.id)
     await ctx.send(f"{amount} points penalty added to {team_tag}.")
 
 @bot.command()
@@ -400,6 +410,7 @@ async def removepenalty(ctx, team_tag: str, amount: int):
     team = team_tag.lower()
     state['penalties'][team] = max(0, state['penalties'][team] - amount)
     save_war_state()
+    generate_overlay_image(state, ctx.guild.id)
     await ctx.send(f"Penalty removed. Current penalty: {state['penalties'][team]} points.")
 
 @bot.command()
@@ -776,6 +787,7 @@ async def on_message(message):
             })
             state['tracks'].append(track_tag)
             save_war_state()
+            generate_overlay_image(state, message.guild.id)
 
             if summary_messages.get(guild_id):
                 try:
