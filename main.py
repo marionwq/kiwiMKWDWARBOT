@@ -24,6 +24,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 ERROR_CHANNEL_ID = 1412586731026251826  
+overlay_cache = {}
 
 war_states = {}
 summary_messages = {}
@@ -253,7 +254,7 @@ def get_embed_color(diff):
 
     return discord.Color.from_rgb(red, green, blue)
 
-def generate_overlay_image(state):
+def generate_overlay_image(state, guild_id):
     width, height = 800, 250
     img = Image.new("RGBA", (width, height), (0,0,0,0))
     draw = ImageDraw.Draw(img)
@@ -286,30 +287,34 @@ def generate_overlay_image(state):
     text = f"{team_tag} vs {opp_tag}"
     bbox = draw.textbbox((0,0), text, font=font) 
     text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-    draw.text(((800 - text_width)//2, 30), text, fill="white", font=font, ha="center", size=32)
-    
+    draw.text(((800 - text_width)//2, 30), text, fill="white", font=font)
+
     font = ImageFont.truetype("Splatoon2.otf", 34)
     text = f"(± {abs(team_total - opp_total)})"
     bbox = draw.textbbox((0,0), text, font=font) 
     text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-    draw.text(((800 - text_width)//2, 4), text, fill="white", font=font, ha="center", size=32)
-    
+    draw.text(((800 - text_width)//2, 4), text, fill="white", font=font)
+
     font = ImageFont.truetype("Splatoon2.otf", 52)
-    draw.text((30, 100), f"{team_total}", fill="#BDBDBD", font=font, ha="right")
-    draw.text((685, 100), f"{opp_total}", fill="#BDBDBD", font=font, ha="left")
-    
+    draw.text((30, 100), f"{team_total}", fill="#BDBDBD", font=font)
+    draw.text((685, 100), f"{opp_total}", fill="#BDBDBD", font=font)
+
     text = f"{race_number}/{total_races}"
     bbox = draw.textbbox((0,0), text, font=font) 
     text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
     draw.text(((800 - text_width)//2, 120), text, fill="yellow", font=font)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
+
+    img.close()
+    shadow.close()
+
+    overlay_cache[guild_id] = buf
+
     return buf
+
 
 from flask import Flask, make_response
 import base64
