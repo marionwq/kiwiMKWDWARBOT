@@ -1,4 +1,5 @@
 import discord
+from discord.ext import commands
 from pyngrok import ngrok
 from flask import Flask, send_file, request, make_response
 import os
@@ -14,11 +15,15 @@ import matplotlib.ticker as mticker
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 import threading
 import base64
+import asyncio
+import sys 
+import traceback
 
 app = Flask(__name__)
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
+ERROR_CHANNEL_ID = 1412586731026251826  
 
 war_states = {}
 summary_messages = {}
@@ -88,6 +93,42 @@ emojis = {
     "CC": "<:CC:1389656259443163300>",
     "MBC": "<:MBC:1389656225691734108>"
 }
+
+async def send_error_to_channel(error_text: str):
+    await bot.wait_until_ready()
+    channel = bot.get_channel(ERROR_CHANNEL_ID)
+    if channel:
+        if len(error_text) > 1900:
+            chunks = [error_text[i:i+1900] for i in range(0, len(error_text), 1900)]
+            for chunk in chunks:
+                await channel.send(f"```py\n{chunk}\n```")
+        else:
+            await channel.send(f"```py\n{error_text}\n```")
+
+@bot.event
+async def on_command_error(ctx, error):
+    error_text = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    await send_error_to_channel(error_text)
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    error_text = traceback.format_exc()
+    await send_error_to_channel(f"Ignoring exception in {event}:\n{error_text}")
+
+def handle_exception(loop, context):
+    error = context.get("exception")
+    if error:
+        error_text = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    else:
+        error_text = context.get("message", "Unknown error")
+    asyncio.create_task(send_error_to_channel(error_text))
+
+loop = asyncio.get_event_loop()
+loop.set_exception_handler(handle_exception)
+
+@bot.command()
+async def crash(ctx):
+    1 / 0 
 
 
 def get_war_state(guild_id):
@@ -246,7 +287,7 @@ def generate_overlay_image(state):
     bbox = draw.textbbox((0,0), text, font=font) 
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
-    draw.text(((800 - text_width)//2, 10), text, fill="white", font=font, ha="center", size=32)
+    draw.text(((800 - text_width)//2, 30), text, fill="white", font=font, ha="center", size=32)
     
     font = ImageFont.truetype("Splatoon2.otf", 34)
     text = f"(± {abs(team_total - opp_total)})"
@@ -259,7 +300,7 @@ def generate_overlay_image(state):
     draw.text((30, 100), f"{team_total}", fill="#BDBDBD", font=font, ha="right")
     draw.text((685, 100), f"{opp_total}", fill="#BDBDBD", font=font, ha="left")
     
-    text = f"{race_number-1}/{total_races}"
+    text = f"{race_number}/{total_races}"
     bbox = draw.textbbox((0,0), text, font=font) 
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
@@ -282,7 +323,11 @@ def overlay(guild_id):
         return "No war state for this guild.", 404
 
     try:
-        img_buf = generate_overlay_image(state)
+        if guild_id in overlay_cache:
+            img_buf = overlay_cache[guild_id]
+        else:
+            img_buf = generate_overlay_image(state, guild_id) 
+
         img_b64 = base64.b64encode(img_buf.getvalue()).decode()
 
         html = f"""
@@ -290,7 +335,6 @@ def overlay(guild_id):
         <html lang="en">
         <head>
             <meta charset="UTF-8">
-            <meta http-equiv="refresh" content="2">
             <title>Overlay</title>
             <style>
                 body {{ margin:0; padding:0; background:transparent; }}
