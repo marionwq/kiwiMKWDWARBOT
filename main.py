@@ -12,6 +12,7 @@ import random
 import io
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import matplotlib
 
 
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
@@ -159,7 +160,8 @@ def save_war_state():
         json.dump(war_states, f)
 
     for gid, state in war_states.items():
-        generate_overlay_image(state, int(gid))
+        if isinstance(gid, int) or (isinstance(gid, str) and gid.isdigit()):
+            generate_overlay_image(state, int(gid))
 
 def load_war_states():
     global war_states
@@ -318,7 +320,6 @@ def generate_overlay_image(state, guild_id):
     img.close()
     shadow.close()
 
-    buf = generate_overlay_image(state, guild_id)
     overlay_cache[guild_id] = io.BytesIO(buf.getvalue())
 
     return buf
@@ -437,11 +438,6 @@ async def endwar(ctx):
     # Ultima pista giocata
     track_tag = state['results'][-1]['track_tag']
     bg_img = load_track_bg(track_tag)
-    bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=3))
-    
-    # Aumento luminosità dello sfondo
-    enhancer = ImageEnhance.Brightness(bg_img)
-    bg_img = enhancer.enhance(1.08)
     
     team_tag = state.get('team_tag', "Team A")
     opp_tag  = state.get('opponent_tag', "Team B")
@@ -462,20 +458,17 @@ async def endwar(ctx):
     save_war_state()
     embed = format_summary_embed(ctx.guild.id)
 
-    # === Calcola cumulativi e differenza ===
     team_cum = [sum(team_scores[:i+1]) for i in range(len(team_scores))]
     opp_cum  = [sum(opp_scores[:i+1]) for i in range(len(opp_scores))]
     diff = [t - o for t, o in zip(team_cum, opp_cum)]
     races = list(range(1, len(team_scores)+1))
 
-    # === Crea grafico trasparente ===
     fig, ax = plt.subplots(figsize=(6,3))
     for spine in ax.spines.values():
         spine.set_visible(False)
     ax.set_facecolor("none")
     fig.patch.set_alpha(0)
 
-    # Y-ticks
     min_diff = int(min(diff))
     max_diff = int(max(diff))
     mid_low  = int((min_diff + 0) / 2) if min_diff < -20 else 0
@@ -484,7 +477,6 @@ async def endwar(ctx):
     ax.set_yticks(yticks)
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
 
-    # Titolo (Team vs Team)
     ax.text(0.41, 1.05, team_tag, color="#424242", fontsize="32", fontweight="bold",
             ha='right', transform=ax.transAxes)
     ax.text(0.51, 1.05, opp_tag, color="#424242", fontsize="32", fontweight="bold",
