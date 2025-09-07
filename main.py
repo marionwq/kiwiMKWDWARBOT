@@ -337,11 +337,7 @@ def overlay(guild_id):
         return "No war state for this guild.", 404
 
     try:
-        if guild_id in overlay_cache:
-            img_buf = io.BytesIO(overlay_cache[guild_id].getvalue())
-        else:
-            img_buf = generate_overlay_image(state, guild_id) 
-
+        img_buf = generate_overlay_image(state, guild_id)
         img_b64 = base64.b64encode(img_buf.getvalue()).decode()
 
         html = f"""
@@ -349,6 +345,7 @@ def overlay(guild_id):
         <html lang="en">
         <head>
             <meta charset="UTF-8">
+            <meta http-equiv="refresh" content="2">
             <title>Overlay</title>
             <style>
                 body {{ margin:0; padding:0; background:transparent; }}
@@ -675,7 +672,6 @@ def format_summary_embed(guild_id):
         color=color
     )
 
-    # Conteggio gare vinte, perse, pareggiate
     wins = losses = draws = 0
 
     for result in state['results']:
@@ -688,7 +684,6 @@ def format_summary_embed(guild_id):
         value = f"{result['team_points']} : {result['opponent_points']} ({diff_race:+}) | {placements_str}"
         embed.add_field(name=name, value=value, inline=False)
 
-        # Conteggio win/lose/draw
         if diff_race > 0:
             wins += 1
         elif diff_race < 0:
@@ -696,7 +691,6 @@ def format_summary_embed(guild_id):
         else:
             draws += 1
 
-    # Penalità se presenti
     if team_penalty > 0 or opp_penalty > 0:
         pen_msg = ""
         if team_penalty > 0:
@@ -705,13 +699,12 @@ def format_summary_embed(guild_id):
             pen_msg += f"**{opp_tag}**: -{opp_penalty} punti"
         embed.add_field(name="Penalties", value=pen_msg, inline=False)
 
-    # Sezione riassuntiva win/loss
     summary = f"W: **{wins}**  L: **{losses}**"
     if draws > 0:
         summary += f"  T: **{draws}**"
     embed.add_field(name="Stats", value=summary, inline=False)
 
-    if state['results'] and state['war_active']:  # se almeno una gara è stata giocata
+    if state['results'] and state['war_active']: 
         last_race = state['results'][-1]
         rec = suggest_tracks(last_race['placements'])
         random.shuffle(rec)
@@ -801,7 +794,7 @@ async def on_message(message):
     await bot.process_commands(message)
 
 def run_flask():
-    app.run(host="0.0.0.0", port=13047)  # porta di WispByte
+    app.run(host="0.0.0.0", port=13047)  
 
 threading.Thread(target=run_flask, daemon=True).start()
 
