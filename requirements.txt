@@ -3,4 +3,5 @@ python-dotenv==1.0.1
 Flask==3.0.3
 Pillow==10.4.0
 matplotlib==3.9.2
-pyngrok==7.1.6
+requests
+firebase-admin

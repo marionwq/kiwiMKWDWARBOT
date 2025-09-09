@@ -106,3 +106,5 @@ dmypy.json
 
 # Cython
 cython_debug/
+
+serviceAccountKey.json

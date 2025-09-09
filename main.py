@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-from pyngrok import ngrok
 from flask import Flask, send_file, request, make_response
 import os
 from threading import Thread
@@ -13,6 +12,10 @@ import io
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import matplotlib
+import time
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
 
 
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
@@ -33,6 +36,12 @@ matplotlib.rcParams["mathtext.default"] = "regular"
 matplotlib.rcParams["axes.unicode_minus"] = False
 war_states = {}
 summary_messages = {}
+public_url = "https://marionwq.github.io/kiwi-overlay"
+
+cred = credentials.Certificate("serviceAccountKey.json")
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://kiwi-overlay-default-rtdb.europe-west1.firebasedatabase.app/'
+})
 
 track_names = {
     "RPB": "Peach Beach",
@@ -100,6 +109,21 @@ emojis = {
     "MBC": "<:MBC:1389656225691734108>"
 }
 
+def start_localtunnel(port=13047, subdomain="kiwioverlay"):
+    process = subprocess.Popen(
+        ["npx", "localtunnel", "--port", str(port), "--subdomain", subdomain],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
+
+    for line in process.stdout:
+        if "your url is:" in line.lower():
+            url = re.search(r"(https://[^\s]+)", line).group(1)
+            return url
+
+    return None
+
 async def send_error_to_channel(error_text: str):
     await bot.wait_until_ready()
     channel = bot.get_channel(ERROR_CHANNEL_ID)
@@ -121,6 +145,21 @@ async def on_error(event, *args, **kwargs):
     error_text = traceback.format_exc()
     await send_error_to_channel(f"Ignoring exception in {event}:\n{error_text}")
 
+def push_war_state_to_firebase(guild_id):
+    state = get_war_state(guild_id)
+    server_key = str(guild_id)
+
+    data = {
+        "teams": [state.get('team_tag', 'Team A'), state.get('opponent_tag', 'Team B')],
+        "scores": [sum(state.get('team_scores', [])), sum(state.get('opponent_scores', []))],
+        "dif": f"+{sum(state.get('team_scores', [])) - sum(state.get('opponent_scores', []))}",
+        "win": sum(state.get('team_scores', [])) > sum(state.get('opponent_scores', [])),
+        "left": state.get('total_races', 12) - state.get('current_race', 1) + 1
+    }
+
+    ref = db.reference(f'/server/{server_key}')
+    ref.set(data)
+    
 def handle_exception(loop, context):
     error = context.get("exception")
     if error:
@@ -162,6 +201,8 @@ def save_war_state():
     for gid, state in war_states.items():
         if isinstance(gid, int) or (isinstance(gid, str) and gid.isdigit()):
             generate_overlay_image(state, int(gid))
+            push_war_state_to_firebase(gid)
+        
 
 def load_war_states():
     global war_states
@@ -247,15 +288,12 @@ def get_embed_color(diff):
     diff = max(-max_diff, min(diff, max_diff))
 
     if diff > 0:
-        # più positivo = più verde, meno giallo
         green = 255
         red = int(255 * (max_diff - diff) / max_diff)
     elif diff < 0:
-        # più negativo = più rosso, meno giallo
         red = 255
         green = int(255 * (max_diff + diff) / max_diff)
     else:
-        # zero = giallo pieno
         red = 255
         green = 255
 
@@ -324,12 +362,6 @@ def generate_overlay_image(state, guild_id):
 
     return buf
 
-
-from flask import Flask, make_response
-import base64
-
-app = Flask(__name__)
-
 @app.route("/overlay/<int:guild_id>")
 def overlay(guild_id):
     state = war_states.get(guild_id)
@@ -337,31 +369,9 @@ def overlay(guild_id):
         return "No war state for this guild.", 404
 
     try:
-        img_buf = generate_overlay_image(state, guild_id)
-        img_b64 = base64.b64encode(img_buf.getvalue()).decode()
-
-        html = f"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta http-equiv="refresh" content="2">
-            <title>Overlay</title>
-            <style>
-                body {{ margin:0; padding:0; background:transparent; }}
-                img {{ width:100%; height:auto; display:block; }}
-            </style>
-        </head>
-        <body>
-            <img src="data:image/png;base64,{img_b64}">
-        </body>
-        </html>
-        """
-
-        response = make_response(html)
-        response.headers["ngrok-skip-browser-warning"] = "true"
-        return response
-
+        buf = generate_overlay_image(state, guild_id)
+        buf.seek(0)
+        return send_file(buf, mimetype="image/png")
     except Exception as e:
         return f"Error generating overlay: {e}", 500
 
@@ -421,11 +431,10 @@ async def setchannel(ctx):
 @bot.command()
 async def obs(ctx):
     guild_id = ctx.guild.id
-    state = war_states.get(guild_id)
-    if not state:
-        await ctx.send("No war active for this server.")
-        return
-    await ctx.send(f"Overlay URL: {public_url}/overlay/{guild_id}")
+    url = f"{public_url}/index.html?server={guild_id}"
+    await ctx.send(f"Overlay URL: {url}")
+
+
 
 @bot.command()
 async def endwar(ctx):
@@ -481,35 +490,29 @@ async def endwar(ctx):
     ax.text(0.46, 1.05, "vs", color="#424242", fontsize="18", fontweight="bold",
             ha='center', transform=ax.transAxes)
 
-    # Linea zero
     ax.axhline(0, color='black', linewidth=1)
     
     if max_diff < 20 or min_diff > -20:
         yticks = [y for y in yticks if y != 0]
         ax.set_yticks(yticks)
 
-    # Linea differenza
     ax.plot(races, diff, linewidth=2, color="red")
     ax.tick_params(axis='both', which='both', length=0)
     ax.grid(axis='y')
 
-    # Salva grafico trasparente in buffer
     buf = io.BytesIO()
     plt.savefig(buf, format="PNG", bbox_inches='tight', transparent=True)
     plt.close(fig)
     buf.seek(0)
 
-    # Combina grafico trasparente con sfondo
     graph_img = Image.open(buf).convert("RGBA")
     bg_resized = bg_img.resize(graph_img.size)
     final_img = Image.alpha_composite(bg_resized, graph_img)
 
-    # Salva immagine finale in buffer
     final_buf = io.BytesIO()
     final_img.save(final_buf, format="PNG")
     final_buf.seek(0)
 
-    # Cancella vecchio riepilogo
     if summary_messages.get(guild_id):
         try:
             await summary_messages[guild_id].delete()
@@ -517,7 +520,6 @@ async def endwar(ctx):
             pass
     summary_messages[guild_id] = None
     
-    # Manda immagine finale con embed
     embed.set_image(url="attachment://war_summary.png")
     await ctx.send(embed=embed, file=discord.File(final_buf, filename="war_summary.png"))
 
@@ -552,24 +554,21 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
         await ctx.send("Invalid race number.")
         return
 
-    # Recupera dati attuali
     current_result = state['results'][race_number - 1]
 
-    # --- Gestione pista ---
-    if track_tag:  # se è stata passata una pista
+    if track_tag:
         tag = track_tag.strip().upper()
         if tag not in track_names:
             await ctx.send("Unknown track tag.")
             return
         track = tag
-    else:  # se non è stata passata, mantieni quella vecchia
+    else:
         track = current_result.get('track_tag')
         if not track:
             await ctx.send("Unknown error.")
             return
 
-    # --- Gestione piazzamenti ---
-    if placements_raw:  # se ci sono piazzamenti nuovi
+    if placements_raw:
         content = " ".join(placements_raw)
         digits_only = re.sub(r"[^\d]", "", content)
         placements = parse_positions(digits_only)
@@ -585,20 +584,18 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
         if len(placements) != 6 or len(set(placements)) != 6:
             await ctx.send("Placements needs to be 6 different numbers between 1 and 12.")
             return
-    else:  # nessun piazzamento nuovo → mantieni quelli vecchi
+    else:
         placements = current_result.get('placements')
         if not placements:
             await ctx.send("Unknown error.")
             return
 
-    # --- Calcolo punti ---
     team_set = set(placements)
     opponent_set = set(range(1, 13)) - team_set
 
     team_points = calculate_points(placements)
     opponent_points = calculate_points(opponent_set)
 
-    # --- Aggiorna stato ---
     state['results'][race_number - 1] = {
         'race': race_number,
         'track_tag': track,
@@ -611,21 +608,18 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
     state['team_scores'][race_number - 1] = team_points
     state['opponent_scores'][race_number - 1] = opponent_points
 
-    # --- Mantieni sincronizzata la lista tracks ---
     if 'tracks' not in state:
         state['tracks'] = []
 
     if len(state['tracks']) >= race_number:
         state['tracks'][race_number - 1] = track
     else:
-        # Se per qualche motivo manca, riempi fino alla gara attuale
         while len(state['tracks']) < race_number - 1:
             state['tracks'].append(None)
         state['tracks'].append(track)
 
     save_war_state()
 
-    # --- Aggiorna embed ---
     guild_id = ctx.guild.id
     if summary_messages.get(guild_id):
         try:
@@ -797,17 +791,6 @@ def run_flask():
     app.run(host="0.0.0.0", port=13047)  
 
 threading.Thread(target=run_flask, daemon=True).start()
-
-
-ngrok.set_auth_token("324Zf8lyqLgA4Q2fRJVvG56HJJ0_4bDfKxk1VogEJi73Pd9Wp")
-tunnel = ngrok.connect(13047, bind_tls=True)
-public_url = tunnel.public_url
-print(f"Overlay URL: {public_url}/overlay/<guild_id>")
-
-@app.after_request
-def skip_ngrok_warning(response):
-    response.headers["ngrok-skip-browser-warning"] = "true"
-    return response
 
 if __name__ == "__main__":
     load_dotenv()
