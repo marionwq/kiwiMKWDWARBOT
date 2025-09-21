@@ -18,6 +18,7 @@ It tracks races, calculates scores automatically, applies penalties, and suggest
 - Track suggestions based on last race results
 - Multi-server support (each server keeps its own war state)
 - Persistent war data saved in state.json
+- Auto-refreshing dynamic OBS overlay
 
 ---
 
@@ -32,7 +33,7 @@ It tracks races, calculates scores automatically, applies penalties, and suggest
 | `!back` | Cancel the last recorded race |
 | `!editrace <race_number> [track_tag] [placements]` | Edit an existing race. `!editrace <race_number> [track_tag]` also works and wont change the inserted placements. |
 | `!endwar` | Finish the war and generate the final summary |
-
+| `!obs` | Get a dynamic url for an auto-refreshing OBS overlay |
 Additionally:  
 - You can type a **track tag** (e.g. `DBB`) to set the next race track.  
 - You can input **placements** (e.g. `1 3 6 7 9 12`) directly, and Kiwi will record the race.  
