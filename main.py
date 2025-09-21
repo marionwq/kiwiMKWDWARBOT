@@ -168,7 +168,12 @@ def handle_exception(loop, context):
         error_text = context.get("message", "Unknown error")
     asyncio.create_task(send_error_to_channel(error_text))
 
-loop = asyncio.get_event_loop()
+try:
+    loop = asyncio.get_running_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
 loop.set_exception_handler(handle_exception)
 
 @bot.command()
@@ -274,14 +279,24 @@ def parse_positions(s: str):
 
     return sorted(set(result))
 
-def load_track_bg(track_tag):
+def load_track_bg(track_tag=None):
     base_path = "tracks_bg"
-    candidates = [f"BG{track_tag}.png", f"BG{track_tag}.jpg"]
+
+    if track_tag:
+        candidates = [f"BG{track_tag}.png", f"BG{track_tag}.jpg"]
+    else:
+        candidates = ["BGNone.png", "BGNone.jpg"]
 
     for filename in candidates:
         filepath = os.path.join(base_path, filename)
         if os.path.exists(filepath):
             return Image.open(filepath).convert("RGBA")
+        
+    default_file = os.path.join(base_path, "BGNone.png")
+    if os.path.exists(default_file):
+        return Image.open(default_file).convert("RGBA")
+
+    return Image.new("RGBA", (800, 600), (0, 0, 0, 0))
         
 def get_embed_color(diff):
     max_diff = 70  
