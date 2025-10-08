@@ -580,7 +580,7 @@ async def back(ctx):
             state[key].pop()
     state['current_track'] = None
     save_war_state()
-    await ctx.send(f"Race {state['current_race'] + 1} cancelled.")
+    await ctx.send(f"Race {state['current_race']} cancelled.")
     
 @bot.command()
 async def serverlist(ctx):
