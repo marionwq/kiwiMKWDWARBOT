@@ -1,7 +1,7 @@
-discord.py==2.4.0
-python-dotenv==1.0.1
-Flask==3.0.3
-Pillow==10.4.0
-matplotlib==3.9.2
-requests
-firebase-admin
+discord.py>=2.4.0
+audioop-lts>=0.2.1; python_version >= "3.13"
+Flask>=3.0.0
+python-dotenv>=1.0.0
+Pillow>=10.0.0
+matplotlib>=3.8.0
+firebase-admin>=6.2.0
