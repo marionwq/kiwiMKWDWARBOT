@@ -681,7 +681,7 @@ def format_summary_embed(guild_id):
             inline=False
         )
         embed.set_footer(
-            text="Kiwi by marionee - 1.2.8",
+            text="Kiwi by marionee - 1.2.9",
         )
     return embed
 
