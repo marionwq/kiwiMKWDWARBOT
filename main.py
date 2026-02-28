@@ -4,7 +4,6 @@ from flask import Flask, send_file, request, make_response
 import os
 from threading import Thread
 from dotenv import load_dotenv
-from discord.ext import commands
 import re
 import json
 import random
@@ -235,7 +234,6 @@ def save_war_state():
 
     for gid, state in war_states.items():
         if isinstance(gid, int) or (isinstance(gid, str) and gid.isdigit()):
-            generate_overlay_image(state, int(gid))
             push_war_state_to_firebase(gid)
         
 
@@ -262,18 +260,19 @@ def parse_positions(s: str):
     for token in tokens:
         if '-' in token:
             start_str, end_str = token.split('-')
+            
             start_list = []
-            if int(start_str) > 12:
-                for i, ch in enumerate(start_str):
-                    if start_str[i:i+2] in ["10","11","12"]:
-                        start_list.append(int(start_str[i:i+2]))
-                        break
-                    else:
-                        start_list.append(int(ch))
-            elif start_str == "12":
-                start_list.extend([1,2])
-            else:
-                start_list.append(int(start_str))
+            i = 0
+            while i < len(start_str):
+                if start_str[i:i+2] == "12":
+                    start_list.extend([1, 2])
+                    i += 2
+                elif start_str[i:i+2] in ["10", "11"]:
+                    start_list.append(int(start_str[i:i+2]))
+                    i += 2
+                else:
+                    start_list.append(int(start_str[i]))
+                    i += 1
             
             end_list = []
             i = 0
@@ -285,10 +284,14 @@ def parse_positions(s: str):
                     end_list.append(int(end_str[i]))
                     i += 1
 
-            range_start = start_list[-1]+1
-            range_end = end_list[0]-1
+            if not start_list or not end_list:
+                continue
+
+            range_start = start_list[-1] + 1
+            range_end = end_list[0] - 1
+            
             if range_start <= range_end:
-                mid_range = list(range(range_start, range_end+1))
+                mid_range = list(range(range_start, range_end + 1))
             else:
                 mid_range = []
 
@@ -315,14 +318,14 @@ def load_track_bg(track_tag=None):
     if track_tag:
         candidates = [f"BG{track_tag}.png", f"BG{track_tag}.jpg"]
     else:
-        candidates = ["BGNone.png", "BGNone.jpg"]
+        candidates = ["BG.png", "BG.jpg"]
 
     for filename in candidates:
         filepath = os.path.join(base_path, filename)
         if os.path.exists(filepath):
             return Image.open(filepath).convert("RGBA")
         
-    default_file = os.path.join(base_path, "BGNone.png")
+    default_file = os.path.join(base_path, "BG.png")
     if os.path.exists(default_file):
         return Image.open(default_file).convert("RGBA")
 
@@ -346,80 +349,6 @@ def get_embed_color(diff):
 
     return discord.Color.from_rgb(red, green, blue)
 
-def generate_overlay_image(state, guild_id):
-    width, height = 800, 250
-    img = Image.new("RGBA", (width, height), (0,0,0,0))
-    draw = ImageDraw.Draw(img)
-
-    rect_x0, rect_y0 = 10, 10
-    rect_x1, rect_y1 = width - 10, height - 10
-    radius = 25
-
-    shadow = Image.new("RGBA", img.size, (0,0,0,0))
-    shadow_draw = ImageDraw.Draw(shadow)
-    shadow_color = (0, 0, 0, 120)
-    shadow_offset = 3
-    shadow_draw.rounded_rectangle(
-        [rect_x0 + shadow_offset, rect_y0 + shadow_offset, rect_x1 + shadow_offset, rect_y1 + shadow_offset],
-        radius=radius, fill=shadow_color
-    )
-    shadow = shadow.filter(ImageFilter.GaussianBlur(4))
-    img = Image.alpha_composite(img, shadow)
-    draw = ImageDraw.Draw(img)
-    draw.rounded_rectangle([rect_x0, rect_y0, rect_x1, rect_y1], radius=radius, fill=(30,30,30,200))
-
-    team_total = sum(state['team_scores'])
-    opp_total  = sum(state['opponent_scores'])
-    team_tag = state.get('team_tag', "Team A")
-    opp_tag  = state.get('opponent_tag', "Team B")
-    race_number = state.get('current_race', 1)
-    total_races = state.get('total_races', 12)
-
-    font = ImageFont.truetype("Splatoon2.otf", 64)
-    text = f"{team_tag} vs {opp_tag}"
-    bbox = draw.textbbox((0,0), text, font=font) 
-    text_width = bbox[2] - bbox[0]
-    draw.text(((800 - text_width)//2, 30), text, fill="white", font=font)
-
-    font = ImageFont.truetype("Splatoon2.otf", 34)
-    text = f"(± {abs(team_total - opp_total)})"
-    bbox = draw.textbbox((0,0), text, font=font) 
-    text_width = bbox[2] - bbox[0]
-    draw.text(((800 - text_width)//2, 4), text, fill="white", font=font)
-
-    font = ImageFont.truetype("Splatoon2.otf", 52)
-    draw.text((30, 100), f"{team_total}", fill="#BDBDBD", font=font)
-    draw.text((685, 100), f"{opp_total}", fill="#BDBDBD", font=font)
-
-    text = f"{race_number}/{total_races}"
-    bbox = draw.textbbox((0,0), text, font=font) 
-    text_width = bbox[2] - bbox[0]
-    draw.text(((800 - text_width)//2, 120), text, fill="yellow", font=font)
-
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-
-    img.close()
-    shadow.close()
-
-    overlay_cache[guild_id] = io.BytesIO(buf.getvalue())
-
-    return buf
-
-@app.route("/overlay/<int:guild_id>")
-def overlay(guild_id):
-    state = war_states.get(guild_id)
-    if not state:
-        return "No war state for this guild.", 404
-
-    try:
-        buf = generate_overlay_image(state, guild_id)
-        buf.seek(0)
-        return send_file(buf, mimetype="image/png")
-    except Exception as e:
-        return f"Error generating overlay: {e}", 500
-
 @bot.command()
 async def warstart(ctx, our_team_tag: str = None, opponent_team_tag: str = None):
     if not our_team_tag or not opponent_team_tag:
@@ -440,7 +369,6 @@ async def warstart(ctx, our_team_tag: str = None, opponent_team_tag: str = None)
     })
     summary_messages[ctx.guild.id] = None
     save_war_state()
-    generate_overlay_image(state, ctx.guild.id)
     await ctx.send(f"War started: `{our_team_tag}` vs `{opponent_team_tag}` in {ctx.channel.mention}!")
 
 @bot.command()
@@ -451,7 +379,6 @@ async def addpenalty(ctx, team_tag: str, amount: int):
         return
     state['penalties'][team_tag.lower()] += amount
     save_war_state()
-    generate_overlay_image(state, ctx.guild.id)
     await ctx.send(f"{amount} points penalty added to {team_tag}.")
 
 @bot.command()
@@ -463,7 +390,6 @@ async def removepenalty(ctx, team_tag: str, amount: int):
     team = team_tag.lower()
     state['penalties'][team] = max(0, state['penalties'][team] - amount)
     save_war_state()
-    generate_overlay_image(state, ctx.guild.id)
     await ctx.send(f"Penalty removed. Current penalty: {state['penalties'][team]} points.")
 
 @bot.command()
@@ -505,7 +431,7 @@ async def endwar(ctx):
     total_team = raw_team_total - team_penalty
     total_opp  = raw_opp_total - opp_penalty
 
-    state['war_active'] = False
+    state['war_active'] = True
     save_war_state()
     embed = format_summary_embed(ctx.guild.id)
 
@@ -671,9 +597,11 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
             await summary_messages[guild_id].delete()
         except discord.NotFound:
             pass
-        embed = format_summary_embed(guild_id)
-        summary_messages[guild_id] = await ctx.send(embed=embed)
-
+            ctx.send("War summary not found.")
+            
+            
+    embed = format_summary_embed(guild_id)
+    summary_messages[guild_id] = await ctx.send(embed=embed)
     await ctx.send(f"Race number {race_number} updated.")
 
 def suggest_tracks(placements):
@@ -814,7 +742,6 @@ async def on_message(message):
             })
             state['tracks'].append(track_tag)
             save_war_state()
-            generate_overlay_image(state, message.guild.id)
 
             if summary_messages.get(guild_id):
                 try:
