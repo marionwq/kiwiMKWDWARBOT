@@ -368,6 +368,7 @@ async def warstart(ctx, our_team_tag: str = None, opponent_team_tag: str = None)
         'penalties': {'team': 0, 'opponent': 0}
     })
     summary_messages[ctx.guild.id] = None
+    db.reference(f'/server/{ctx.guild.id}').delete()
     save_war_state()
     await ctx.send(f"War started: `{our_team_tag}` vs `{opponent_team_tag}` in {ctx.channel.mention}!")
 
@@ -681,7 +682,7 @@ def format_summary_embed(guild_id):
             inline=False
         )
         embed.set_footer(
-            text="Kiwi by marionee - 1.2.9",
+            text="Kiwi by marionee - 1.2.10",
         )
     return embed
 
@@ -741,24 +742,27 @@ async def on_message(message):
                 'placements': placements
             })
             state['tracks'].append(track_tag)
-            save_war_state()
+            
 
             if summary_messages.get(guild_id):
                 try:
                     await summary_messages[guild_id].delete()
                 except:
                     pass
-
-            embed = format_summary_embed(guild_id)
-            summary_messages[guild_id] = await message.channel.send(embed=embed)
-
+            
             if race < state['total_races']:
                 state['current_race'] += 1
                 state['current_track'] = None
-                return
+                save_war_state()
             else:
+                save_war_state()
                 await endwar(message.channel)
                 return
+
+            embed = format_summary_embed(guild_id)
+            summary_messages[guild_id] = await message.channel.send(embed=embed)
+            return
+            
 
     await bot.process_commands(message)
 
