@@ -594,7 +594,7 @@ async def endwar(ctx):
     total_team = raw_team_total - team_penalty
     total_opp  = raw_opp_total - opp_penalty
 
-    state['war_active'] = True
+    state['war_active'] = False
     save_war_state()
     embed = format_summary_embed(ctx.guild.id)
 
@@ -688,10 +688,10 @@ async def serverlist(ctx):
     await ctx.send("\n" + "\n".join(names))
     
 @bot.command()
-async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw):
+async def editrace(ctx, race_number: int, *args):
     state = get_war_state(ctx.guild.id)
-    if not state['war_active']:
-        await ctx.send("War hasn't started yet.")
+    if not state['results']:
+        await ctx.send("No races to edit yet.")
         return
 
     if not (1 <= race_number <= state['total_races']):
@@ -699,13 +699,16 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
         return
 
     current_result = state['results'][race_number - 1]
+    
+    track_tag = None
+    placements_raw = args
+
+    if args and args[0].strip().upper() in track_names:
+        track_tag = args[0].strip().upper()
+        placements_raw = args[1:]
 
     if track_tag:
-        tag = track_tag.strip().upper()
-        if tag not in track_names:
-            await ctx.send("Unknown track tag.")
-            return
-        track = tag
+        track = track_tag
     else:
         track = current_result.get('track_tag')
         if not track:
@@ -714,8 +717,7 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
 
     if placements_raw:
         content = " ".join(placements_raw)
-        digits_only = re.sub(r"[^\d]", "", content)
-        placements = parse_positions(digits_only)
+        placements = parse_positions(content)
         placements = sorted(set(p for p in placements if 1 <= p <= 12))
 
         if 1 <= len(placements) < 6:
@@ -789,9 +791,11 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
             await summary_messages[guild_id].delete()
         except discord.NotFound:
             pass
-            ctx.send("War summary not found.")
-            
-            
+
+    if not state['war_active']:
+        await endwar(ctx)
+        return
+
     embed = format_summary_embed(guild_id)
     summary_messages[guild_id] = await ctx.send(embed=embed)
     await ctx.send(f"Race number {race_number} updated.")
@@ -986,7 +990,7 @@ def format_summary_embed(guild_id):
             inline=False
         )
         embed.set_footer(
-            text="Kiwi by marionee - 1.2.10",
+            text="Kiwi by marionee - 1.3.1",
         )
     return embed
 
