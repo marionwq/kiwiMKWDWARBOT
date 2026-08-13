@@ -2,7 +2,7 @@
 # 🥝 Kiwi – Mario Kart World War Bot
 
 Kiwi is a **Discord bot** designed to manage **Mario Kart World wars**.  
-It tracks races, calculates scores automatically, applies penalties, and suggests tracks based on the team’s performance.
+It tracks races, calculates scores automatically, applies penalties, and keeps track of statistics.
 
 ---
 
