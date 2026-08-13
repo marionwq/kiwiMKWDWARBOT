@@ -1,6 +1,7 @@
 import discord
+from discord import state
 from discord.ext import commands
-from flask import Flask, send_file, request, make_response
+from flask import Flask, ctx, send_file, request, make_response
 import os
 from threading import Thread
 from dotenv import load_dotenv
@@ -15,6 +16,7 @@ import time
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
+import sqlite3
 
 
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
@@ -36,6 +38,7 @@ matplotlib.rcParams["axes.unicode_minus"] = False
 war_states = {}
 summary_messages = {}
 public_url = "https://marionwq.github.io/kiwi-overlay"
+EMBED_COLOR = discord.Color.from_rgb(46, 79, 47)
 
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred, {
@@ -43,51 +46,51 @@ firebase_admin.initialize_app(cred, {
 })
 
 track_names = {
-    "RPB": "Peach Beach",
-    "PB": "Peach Beach",
-    "SSS": "Salty Salty Speedway",
-    "RR": "Rainbow Road",
-    "RMC": "Mario Circuit (SNES)",
-    "MC": "Mario Circuit (SNES)",
-    "AH": "Acorn Heights",
-    "BC": "Bowser's Castle",
-    "RTF": "Toad's Factory",
-    "TF": "Toad's Factory",
-    "RCM": "Choco Mountain",
-    "CM": "Choco Mountain",
-    "RMMM": "Moo Moo Meadows",
-    "MMM": "Moo Moo Meadows",
-    "DBB": "Dry Bones Burnout",
-    "BCI": "Boo Cinema",
-    "DD": "Dandelion Depths",
-    "CCF": "Cheep Cheep Falls",
-    "GBR": "Great ? Block Ruins",
-    "RDDJ": "Dino Dino Jungle",
-    "DDJ": "Dino Dino Jungle",
-    "PS": "Peach Stadium",
-    "FO": "Faraway Oasis",
-    "RKTB": "Koopa Troopa Beach",
-    "KTB": "Koopa Troopa Beach",
-    "RKB": "Koopa Troopa Beach",
-    "KB": "Koopa Troopa Beach",
-    "RWSH": "Wario Shipyard",
-    "WSH": "Wario Shipyard",
-    "RSHS": "Sky-High Sundae",
-    "SHS": "Sky-High Sundae",
-    "SP": "Starview Peak",
-    "RDKP": "DK Pass",
-    "DKP": "DK Pass",
-    "RAF": "Airship Fortress",
-    "AF": "Airship Fortress",
-    "RWS": "Wario Stadium",
-    "RSGB": "Shy Guy Bazaar",
-    "SGB": "Shy Guy Bazaar",
-    "WS": "Whistletop Summit",
-    "RDH": "Desert Hills (DS)",
-    "DH": "Desert Hills (DS)",
-    "DKS": "DK Spaceport",
-    "CC": "Crown City",
-    "MBC": "Mario Bros. Circuit"
+    "RPB": "Peach Beach (GCN) - rPB",
+    "PB": "Peach Beach (GCN) - rPB",
+    "SSS": "Salty Salty Speedway - SSS",
+    "RR": "Rainbow Road - RR",
+    "RMC": "Mario Circuit (SNES) - rMC",
+    "MC": "Mario Circuit (SNES) - rMC",
+    "AH": "Acorn Heights - AH",
+    "BC": "Bowser's Castle - BC",
+    "RTF": "Toad's Factory (Wii) - rTF",
+    "TF": "Toad's Factory (Wii) - rTF",
+    "RCM": "Choco Mountain (N64) - rCM",
+    "CM": "Choco Mountain (N64) - rCM",
+    "RMMM": "Moo Moo Meadows (Wii) - rMMM",
+    "MMM": "Moo Moo Meadows (Wii) - rMMM",
+    "DBB": "Dry Bones Burnout - DBB",
+    "BCI": "Boo Cinema - BCi",
+    "DD": "Dandelion Depths - DD",
+    "CCF": "Cheep Cheep Falls - CCF",
+    "GBR": "Great ? Block Ruins - GBR",
+    "RDDJ": "Dino Dino Jungle (GCN) - rDDJ",
+    "DDJ": "Dino Dino Jungle (GCN) - rDDJ",
+    "PS": "Peach Stadium - PS",
+    "FO": "Faraway Oasis - FO",
+    "RKTB": "Koopa Troopa Beach (SNES) - rKTB",
+    "KTB": "Koopa Troopa Beach (SNES) - rKTB",
+    "RKB": "Koopa Troopa Beach (SNES) - rKTB",
+    "KB": "Koopa Troopa Beach (SNES) - rKTB",
+    "RWSH": "Wario Shipyard (3DS) - rWSh",
+    "WSH": "Wario Shipyard (3DS) - rWSh",
+    "RSHS": "Sky-High Sundae (Tour) - rSHS",
+    "SHS": "Sky-High Sundae (Tour) - rSHS",
+    "SP": "Starview Peak - SP",
+    "RDKP": "DK Pass (DS) - rDKP",
+    "DKP": "DK Pass (DS) - rDKP",
+    "RAF": "Airship Fortress (DS) - rAF",
+    "AF": "Airship Fortress (DS) - rAF",
+    "RWS": "Wario Stadium (N64) - rWS",
+    "RSGB": "Shy Guy Bazaar (3DS) - rSGB",
+    "SGB": "Shy Guy Bazaar (3DS) - rSGB",
+    "WS": "Whistletop Summit - WS",
+    "RDH": "Desert Hills (DS) - rDH",
+    "DH": "Desert Hills (DS) - rDH",
+    "DKS": "DK Spaceport - DKS",
+    "CC": "Crown City - CC",
+    "MBC": "Mario Bros. Circuit - MBC"
 }
 
 emojis = {
@@ -138,20 +141,174 @@ emojis = {
     "MBC": "<:MBC:1389656225691734108>"
 }
 
-def start_localtunnel(port=13047, subdomain="kiwioverlay"):
-    process = subprocess.Popen(
-        ["npx", "localtunnel", "--port", str(port), "--subdomain", subdomain],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True
-    )
+DB_PATH = "stats.db"
+MAX_TRACK_PERFORMANCES = 50
 
-    for line in process.stdout:
-        if "your url is:" in line.lower():
-            url = re.search(r"(https://[^\s]+)", line).group(1)
-            return url
 
-    return None
+def init_stats_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS performances (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER NOT NULL,
+            track_tag TEXT NOT NULL,
+            diff INTEGER NOT NULL,
+            placements TEXT NOT NULL,
+            timestamp REAL NOT NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_track_history
+        ON performances(guild_id, track_tag, timestamp DESC)
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def normalize_track_tag(track_tag):
+    aliases = {
+        "RPB": "PB",
+        "RMC": "MC",
+        "RTF": "TF",
+        "RCM": "CM",
+        "RMMM": "MMM",
+        "RDDJ": "DDJ",
+
+        "RKTB": "KTB",
+        "RKB": "KTB",
+        "KB": "KTB",
+
+        "RWSH": "WSH",
+        "RSHS": "SHS",
+        "RDKP": "DKP",
+        "RAF": "AF",
+        "RWS": "WS",
+        "RSGB": "SGB",
+        "RDH": "DH",
+}
+
+    return aliases.get(track_tag.upper(), track_tag.upper())
+
+
+def save_track_performance(guild_id, track_tag, diff, placements):
+    track_tag = normalize_track_tag(track_tag)
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO performances
+        (guild_id, track_tag, diff, placements, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+    """, (
+        guild_id,
+        track_tag,
+        diff,
+        json.dumps(placements),
+        time.time()
+    ))
+
+    performance_id = cursor.lastrowid
+
+    cursor.execute("""
+        DELETE FROM performances
+        WHERE guild_id = ?
+          AND track_tag = ?
+          AND id NOT IN (
+              SELECT id
+              FROM performances
+              WHERE guild_id = ?
+                AND track_tag = ?
+              ORDER BY timestamp DESC
+              LIMIT ?
+          )
+    """, (
+        guild_id,
+        track_tag,
+        guild_id,
+        track_tag,
+        MAX_TRACK_PERFORMANCES
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return performance_id
+
+
+def get_track_performances(guild_id, track_tag):
+    track_tag = normalize_track_tag(track_tag)
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, diff, placements, timestamp
+        FROM performances
+        WHERE guild_id = ?
+          AND track_tag = ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+    """, (
+        guild_id,
+        track_tag,
+        MAX_TRACK_PERFORMANCES
+    ))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": row[0],
+            "diff": row[1],
+            "placements": json.loads(row[2]),
+            "timestamp": row[3]
+        }
+        for row in rows
+    ]
+
+def delete_track_performance(performance_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        DELETE FROM performances
+        WHERE id = ?
+    """, (performance_id,))
+
+    conn.commit()
+    conn.close()
+
+def update_track_performance(performance_id, track_tag, diff, placements):
+    track_tag = normalize_track_tag(track_tag)
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE performances
+        SET track_tag = ?,
+            diff = ?,
+            placements = ?,
+            timestamp = ?
+        WHERE id = ?
+    """, (
+        track_tag,
+        diff,
+        json.dumps(placements),
+        time.time(),
+        performance_id
+    ))
+
+    conn.commit()
+    conn.close()
+
+init_stats_db()
 
 async def send_error_to_channel(error_text: str):
     await bot.wait_until_ready()
@@ -365,7 +522,8 @@ async def warstart(ctx, our_team_tag: str = None, opponent_team_tag: str = None)
         'team_tag': our_team_tag,
         'opponent_tag': opponent_team_tag,
         'channel_id': ctx.channel.id,
-        'penalties': {'team': 0, 'opponent': 0}
+        'penalties': {'team': 0, 'opponent': 0},
+        'tracks': []
     })
     summary_messages[ctx.guild.id] = None
     db.reference(f'/server/{ctx.guild.id}').delete()
@@ -394,11 +552,15 @@ async def removepenalty(ctx, team_tag: str, amount: int):
     await ctx.send(f"Penalty removed. Current penalty: {state['penalties'][team]} points.")
 
 @bot.command()
-async def setchannel(ctx):
+async def setchannel(ctx, channel: discord.TextChannel = None):
     state = get_war_state(ctx.guild.id)
-    state['channel_id'] = ctx.channel.id
+
+    if channel is None:
+        channel = ctx.channel
+
+    state['channel_id'] = channel.id
     save_war_state()
-    await ctx.send(f"Set channel: {ctx.channel.mention}.")
+    await ctx.send(f"Set channel: {channel.mention}.")
 
 @bot.command()
 async def obs(ctx):
@@ -502,9 +664,19 @@ async def back(ctx):
         await ctx.send("Can't go back if at first race.")
         return
     state['current_race'] -= 1
+
+    if state['results']:
+        last_result = state['results'][-1]
+        stats_id = last_result.get('stats_id')
+
+        if stats_id:
+            delete_track_performance(stats_id)
+
     for key in ['team_scores', 'opponent_scores', 'results']:
         if state[key]:
             state[key].pop()
+    if state.get('tracks'):
+        state['tracks'].pop()
     state['current_track'] = None
     save_war_state()
     await ctx.send(f"Race {state['current_race']} cancelled.")
@@ -565,8 +737,26 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
     team_set = set(placements)
     opponent_set = set(range(1, 13)) - team_set
 
+    old_result = state['results'][race_number - 1]
+    stats_id = old_result.get('stats_id')
+
     team_points = calculate_points(placements)
     opponent_points = calculate_points(opponent_set)
+
+    if stats_id:
+        update_track_performance(
+            stats_id,
+            track,
+            team_points - opponent_points,
+            placements
+        )
+    else:
+        stats_id = save_track_performance(
+            ctx.guild.id,
+            track,
+            team_points - opponent_points,
+            placements
+        )
 
     state['results'][race_number - 1] = {
         'race': race_number,
@@ -574,7 +764,8 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
         'track_name': track_names[track],
         'team_points': team_points,
         'opponent_points': opponent_points,
-        'placements': placements
+        'placements': placements,
+        'stats_id': stats_id
     }
 
     state['team_scores'][race_number - 1] = team_points
@@ -604,6 +795,119 @@ async def editrace(ctx, race_number: int, track_tag: str = None, *placements_raw
     embed = format_summary_embed(guild_id)
     summary_messages[guild_id] = await ctx.send(embed=embed)
     await ctx.send(f"Race number {race_number} updated.")
+
+@bot.command()
+async def trackstats(ctx, track_tag: str = None):
+    if not track_tag:
+        await show_track_ranking(ctx)
+        return
+
+    track_tag = track_tag.upper()
+
+    if track_tag not in track_names:
+        await ctx.send("Unknown track tag.")
+        return
+
+    normalized = normalize_track_tag(track_tag)
+    performances = get_track_performances(ctx.guild.id, normalized)
+
+    if not performances:
+        await ctx.send(f"No stats available for **{track_names[track_tag]}**.")
+        return
+
+    diffs = [p["diff"] for p in performances]
+
+    wins = sum(1 for d in diffs if d > 0)
+    losses = sum(1 for d in diffs if d < 0)
+    draws = sum(1 for d in diffs if d == 0)
+
+    total = len(performances)
+    winrate = wins / total * 100
+    avg_diff = sum(diffs) / total
+
+    best = max(performances, key=lambda p: p["diff"])
+    worst = min(performances, key=lambda p: p["diff"])
+
+    def format_placements(placements):
+        return "`" + ", ".join(map(str, placements)) + "`"
+
+    last_5 = performances[:5]
+
+    last_5_str = "`" + "  ".join(
+        f"{p['diff']:+}"
+        for p in reversed(last_5)
+    ) + "`"
+
+    emoji = emojis.get(track_tag, '')
+
+    embed = discord.Embed(
+        title=f"{emoji} {track_names[track_tag]} | Last {total}",
+        color=EMBED_COLOR
+    )
+
+    summary = (
+        f"**W/L/T:** {wins} / {losses} / {draws}\n"
+        f"**Win rate:** {winrate:.1f}%\n\n"
+        f"**Avg diff:** {avg_diff:+.2f}\n"
+        f"**Best:** {best['diff']:+} | {format_placements(best['placements'])}\n"
+        f"**Worst:** {worst['diff']:+} | {format_placements(worst['placements'])}\n\n"
+        f"**Last 5:**\n{last_5_str}"
+    )
+
+    embed.description = summary
+
+    await ctx.send(embed=embed)
+
+
+async def show_track_ranking(ctx):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT track_tag, diff
+        FROM performances
+        WHERE guild_id = ?
+        ORDER BY timestamp DESC
+    """, (ctx.guild.id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    if not rows:
+        await ctx.send("No track statistics available yet.")
+        return
+
+    track_data = {}
+
+    for track_tag, diff in rows:
+        track_data.setdefault(track_tag, [])
+
+        if len(track_data[track_tag]) < MAX_TRACK_PERFORMANCES:
+            track_data[track_tag].append(diff)
+
+    rankings = []
+
+    for track_tag, diffs in track_data.items():
+        if not diffs:
+            continue
+
+        avg_diff = sum(diffs) / len(diffs)
+        rankings.append((track_tag, avg_diff, len(diffs)))
+
+    rankings.sort(key=lambda x: x[1], reverse=True)
+
+    lines = [
+        f"**{i}. {emojis.get(tag, '')} {track_names.get(tag, tag)}** Avg: {avg:+.2f} ({count} race{'s' if count != 1 else ''})"
+        for i, (tag, avg, count) in enumerate(rankings, start=1)
+    ]
+
+    embed = discord.Embed(
+        title="Track Rankings",
+        description="\n".join(lines),
+        color=EMBED_COLOR
+    )
+
+    await ctx.send(embed=embed)
 
 def suggest_tracks(placements):
     top = sum(1 for p in placements if p <= 3)
@@ -711,7 +1015,22 @@ async def on_message(message):
     tag = message.content.strip().upper()
     if tag in track_names and state['war_active']:
         state['current_track'] = tag
-        await message.channel.send(f"Next track: {emojis.get(tag, '')} {track_names[tag]}")
+
+        embed = discord.Embed(
+            title=f"{track_names[tag]}",
+            color=EMBED_COLOR
+        )
+
+        embed.set_author(name="Next track:")
+
+        embed.set_image(
+            url=f"https://raw.githubusercontent.com/marionwq/kiwiMKWDWARBOT/main/tracks_thumbnail/{tag.lower()}thumbnail.jpg?raw=true"
+         )
+
+        embed.set_footer(text="Map: © Super Mario Wiki")
+
+        await message.channel.send(embed=embed)
+
         return
 
     if state['war_active']:
@@ -731,6 +1050,13 @@ async def on_message(message):
             opp_pts = calculate_points(opponent_set)
             race = state['current_race']
 
+            stats_id = save_track_performance(
+                guild_id,
+                track_tag,
+                team_pts - opp_pts,
+                placements
+            )
+
             state['team_scores'].append(team_pts)
             state['opponent_scores'].append(opp_pts)
             state['results'].append({
@@ -739,9 +1065,14 @@ async def on_message(message):
                 'track_name': track_name,
                 'team_points': team_pts,
                 'opponent_points': opp_pts,
-                'placements': placements
+                'placements': placements,
+                'stats_id': stats_id
             })
+
+            
+            
             state['tracks'].append(track_tag)
+
             
 
             if summary_messages.get(guild_id):
