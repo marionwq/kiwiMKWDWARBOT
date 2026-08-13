@@ -22,15 +22,15 @@ It tracks races, calculates scores automatically, applies penalties, and suggest
 
 ## 📜 Commands
 
-- `!warstart <your_tag> <opponent_tag>`  | Start a new war 
-- `!setchannel [channel link/tag/id]` | Set the current channel as war log channel 
-- `!addpenalty <team/opponent> <points>` | Add penalty points 
-- `!removepenalty <team/opponent> <points>` | Remove penalty points 
+- `!warstart <your_tag> <opponent_tag>`  | Start a new war |
+- `!setchannel [channel link/tag/id]` | Set the current channel as war log channel |
+- `!addpenalty <team/opponent> <points>` | Add penalty points |
+- `!removepenalty <team/opponent> <points>` | Remove penalty points |
 - `!back` | Cancel the last recorded race |
-- `!editrace <race_number> [track_tag] [placements]` | Edit an existing race. `[track_tag]` and `[placements]` are optional.
-- `!endwar` | Finish the war and generate the final summary 
-- `!obs` | Returns the overlay OBS browser url.
-- `!trackstats [track_tag]` | Returns statistics relative to the selected track. If no track is selected general statistics are showed.
+- `!editrace <race_number> [track_tag] [placements]` | Edit an existing race. `[track_tag]` and `[placements]` are optional. |
+- `!endwar` | Finish the war and generate the final summary |
+- `!obs` | Returns the overlay OBS browser url. |
+- `!trackstats [track_tag]` | Returns statistics relative to the selected track. If no track is selected general statistics are showed. |
 
 Additionally:  
 - You can type a **track tag** (e.g. `DBB`) to set the next race track.  
