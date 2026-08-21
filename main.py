@@ -186,7 +186,6 @@ def normalize_track_tag(track_tag):
         "RSHS": "SHS",
         "RDKP": "DKP",
         "RAF": "AF",
-        "RWS": "WS",
         "RSGB": "SGB",
         "RDH": "DH",
 }
