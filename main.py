@@ -71,8 +71,6 @@ track_names = {
     "FO": "Faraway Oasis - FO",
     "RKTB": "Koopa Troopa Beach (SNES) - rKTB",
     "KTB": "Koopa Troopa Beach (SNES) - rKTB",
-    "RKB": "Koopa Troopa Beach (SNES) - rKTB",
-    "KB": "Koopa Troopa Beach (SNES) - rKTB",
     "RWSH": "Wario Shipyard (3DS) - rWSh",
     "WSH": "Wario Shipyard (3DS) - rWSh",
     "RSHS": "Sky-High Sundae (Tour) - rSHS",
@@ -90,7 +88,32 @@ track_names = {
     "DH": "Desert Hills (DS) - rDH",
     "DKS": "DK Spaceport - DKS",
     "CC": "Crown City - CC",
-    "MBC": "Mario Bros. Circuit - MBC"
+    "MBC": "Mario Bros. Circuit - MBC",
+
+    "RMC1": "Mario Circuit 1 (SNES) - rMC1",
+    "RMC2": "Mario Circuit 2 (SNES) - rMC2",
+    "RMC3": "Mario Circuit 3 (SNES) - rMC3",
+    "RGV1": "Ghost Valley 1 (SNES) - rGV1",
+    "RGV2": "Ghost Valley 2 (SNES) - rGV2",
+    "RGV3": "Ghost Valley 3 (SNES) - rGV3",
+    "RCI1": "Choco Island 1 (SNES) - rCI1",
+    "RCI2": "Choco Island 2 (SNES) - rCI2",
+    "RKB1": "Koopa Beach 1 (SNES) - rKB1",
+    "RKB": "Koopa Beach 1 (SNES) - rKB1",
+    "RVL1": "Vanilla Lake 1 (SNES) - rVL1",
+    "MC1": "Mario Circuit 1 (SNES) - rMC1",
+    "MC2": "Mario Circuit 2 (SNES) - rMC2",
+    "MC3": "Mario Circuit 3 (SNES) - rMC3",
+    "GV1": "Ghost Valley 1 (SNES) - rGV1",
+    "GV2": "Ghost Valley 2 (SNES) - rGV2",
+    "GV3": "Ghost Valley 3 (SNES) - rGV3",
+    "CI1": "Choco Island 1 (SNES) - rCI1",
+    "CI2": "Choco Island 2 (SNES) - rCI2",
+    "KB1": "Koopa Beach 1 (SNES) - rKB1",
+    "KB": "Koopa Beach 1 (SNES) - rKB1",
+    "VL1": "Vanilla Lake 1 (SNES) - rVL1",
+    "VL": "Vanilla Lake 1 (SNES) - rVL1",
+    "RVL": "Vanilla Lake 1 (SNES) - rVL1"
 }
 
 emojis = {
@@ -118,9 +141,7 @@ emojis = {
     "PS": "<:PS:1389656462602539038>",
     "FO": "<:FO:1389656450527137933>",
     "RKTB": "<:rKTB:1389656437948678235>",
-    "RKB": "<:rKTB:1389656437948678235>",
     "KTB": "<:rKTB:1389656437948678235>",
-    "KB": "<:rKTB:1389656437948678235>",
     "RWSH": "<:rWSh:1389656406956707960>",
     "WSH": "<:rWSh:1389656406956707960>",
     "RSHS": "<:rSHS:1389656391228199104>",
@@ -138,7 +159,32 @@ emojis = {
     "DKS": "<:DKS:1389656299402170492>",
     "WS": "<:WS:1389656280767139930>",
     "CC": "<:CC:1389656259443163300>",
-    "MBC": "<:MBC:1389656225691734108>"
+    "MBC": "<:MBC:1389656225691734108>",
+
+    "RMC1": "<:rMC1:1550560800912048198>",
+    "RMC2": "<:rMC2:1550560857149145170>",
+    "RMC3": "<:rMC3:1550560893128015993>",
+    "RGV1": "<:rGV1:1550560922282758194>",
+    "RGV2": "<:rGV2:1550560954927022170>",
+    "RGV3": "<:rGV3:1550560985163763863>",
+    "RCI1": "<:rCI1:1550561027928752188>",
+    "RCI2": "<:rCI2:1550561060967157883>",
+    "MC1": "<:rMC1:1550560800912048198>",
+    "MC2": "<:rMC2:1550560857149145170>",
+    "MC3": "<:rMC3:1550560893128015993>",
+    "GV1": "<:rGV1:1550560922282758194>",
+    "GV2": "<:rGV2:1550560954927022170>",
+    "GV3": "<:rGV3:1550560985163763863>",
+    "CI1": "<:rCI1:1550561027928752188>",
+    "CI2": "<:rCI2:1550561060967157883>",
+    "RKB1": "<:rKB1:1550561094840615013>",
+    "KB1": "<:rKB1:1550561094840615013>",
+    "KB": "<:rKB1:1550561094840615013>",
+    "RKB": "<:rKB1:1550561094840615013>",
+    "RVL1": "<:rVL1:1550561123764281484>",
+    "VL1": "<:rVL1:1550561123764281484>",
+    "RVL": "<:rVL1:1550561123764281484>",
+    "VL": "<:rVL1:1550561123764281484>"
 }
 
 DB_PATH = "stats.db"
@@ -177,18 +223,28 @@ def normalize_track_tag(track_tag):
         "RCM": "CM",
         "RMMM": "MMM",
         "RDDJ": "DDJ",
-
         "RKTB": "KTB",
-        "RKB": "KTB",
-        "KB": "KTB",
-
         "RWSH": "WSH",
         "RSHS": "SHS",
         "RDKP": "DKP",
         "RAF": "AF",
-        "RWS": "WS",
         "RSGB": "SGB",
         "RDH": "DH",
+        "MC1": "RMC1",
+        "MC2": "RMC2",
+        "MC3": "RMC3",
+        "GV1": "RGV1",
+        "GV2": "RGV2",
+        "GV3": "RGV3",
+        "CI1": "RCI1",
+        "CI2": "RCI2",
+        "KB1": "RKB1",
+        "RKB": "RKB1",
+        "KB": "RKB1",
+        "RVL": "RVL1",
+        "VL1": "RVL1",
+        "VL": "RVL1"
+
 }
 
     return aliases.get(track_tag.upper(), track_tag.upper())
@@ -506,7 +562,7 @@ def get_embed_color(diff):
 
     return discord.Color.from_rgb(red, green, blue)
 
-@bot.command()
+@bot.command(name="warstart", aliases=["ws"])
 async def warstart(ctx, our_team_tag: str = None, opponent_team_tag: str = None):
     if not our_team_tag or not opponent_team_tag:
         await ctx.send("Use: !warstart <your_tag> <opponent_tag>")
@@ -530,7 +586,7 @@ async def warstart(ctx, our_team_tag: str = None, opponent_team_tag: str = None)
     save_war_state()
     await ctx.send(f"War started: `{our_team_tag}` vs `{opponent_team_tag}` in {ctx.channel.mention}!")
 
-@bot.command()
+@bot.command(name="addpenalty", aliases=["ap"])
 async def addpenalty(ctx, team_tag: str, amount: int):
     state = get_war_state(ctx.guild.id)
     if team_tag.lower() not in ['team', 'opponent'] or amount <= 0:
@@ -540,7 +596,7 @@ async def addpenalty(ctx, team_tag: str, amount: int):
     save_war_state()
     await ctx.send(f"{amount} points penalty added to {team_tag}.")
 
-@bot.command()
+@bot.command(name="removepenalty", aliases=["rp"])
 async def removepenalty(ctx, team_tag: str, amount: int):
     state = get_war_state(ctx.guild.id)
     if team_tag.lower() not in ['team', 'opponent'] or amount <= 0:
@@ -551,7 +607,7 @@ async def removepenalty(ctx, team_tag: str, amount: int):
     save_war_state()
     await ctx.send(f"Penalty removed. Current penalty: {state['penalties'][team]} points.")
 
-@bot.command()
+@bot.command(name="setchannel", aliases=["sc"])
 async def setchannel(ctx, channel: discord.TextChannel = None):
     state = get_war_state(ctx.guild.id)
 
@@ -570,7 +626,7 @@ async def obs(ctx):
 
 
 
-@bot.command()
+@bot.command(name="endwar", aliases=["ew"])
 async def endwar(ctx):
     state = get_war_state(ctx.guild.id)
     guild_id = ctx.guild.id
@@ -687,7 +743,7 @@ async def serverlist(ctx):
     names = [f"{g.name} ({g.id})" for g in guilds]
     await ctx.send("\n" + "\n".join(names))
     
-@bot.command()
+@bot.command(name="editrace", aliases=["er"])
 async def editrace(ctx, race_number: int, *args):
     state = get_war_state(ctx.guild.id)
     if not state['results']:
@@ -800,7 +856,7 @@ async def editrace(ctx, race_number: int, *args):
     summary_messages[guild_id] = await ctx.send(embed=embed)
     await ctx.send(f"Race number {race_number} updated.")
 
-@bot.command()
+@bot.command(name="trackstats", aliases=["ts"])
 async def trackstats(ctx, track_tag: str = None):
     if not track_tag:
         await show_track_ranking(ctx)
@@ -913,17 +969,6 @@ async def show_track_ranking(ctx):
 
     await ctx.send(embed=embed)
 
-def suggest_tracks(placements):
-    top = sum(1 for p in placements if p <= 3)
-    bottom = sum(1 for p in placements if p >= 8)
-
-    if top >= 2 and bottom <= 2:  # tanti davanti
-        return ["RR <:RR:1389656648490025113>", "BC <:BC:1389656620987977760>", "BCi <:BCi:1389656556009947256>", "rSHS <:rSHS:1389656391228199104>", "rAF <:rAF:1389656348333178940>", "rWS <:rWS:1389656338946199776>", "rSGB <:rSGB:1389656322424963122>", "rWSh <:rWSh:1389656406956707960>", "SP <:SP:1389656377550700625>"]
-    elif bottom >= 3 and top <= 2:  # tanti dietro
-        return ["rDH <:rDH:1389656310945026169>", "DKS <:DKS:1389656299402170492>", "rPB <:rPB:1389656673500528680>", "rTF <:rTF:1389656605817049178>", "WS <:WS:1389656280767139930>", "rMC <:rMC:1389656639350771814>", "SSS <:SSS:1389656659877695598>", "rCM <:rCM:1389656590990311507>", "rMMM <:rMMM:1389656573122711614>", "rDDJ <:rDDJ:1389656479971147890>", "rKTB <:rKTB:1389656437948678235>", "rDKP <:rDKP:1389656363764023297>", "MBC <:MBC:1389656225691734108>", "DBB <:DBB:1389656564347961374>", "CC <:CC:1389656259443163300>"]
-    else:  # situazione mista
-        return ["AH <:AH:1389656629951205527>", "DBB <:DBB:1389656564347961374>", "GBR <:GBR:1389656508022788218>", "PS <:PS:1389656462602539038>", "FO <:FO:1389656450527137933>", "SP <:SP:1389656377550700625>", "rSGB <:rSGB:1389656322424963122>", "CC <:CC:1389656259443163300>", "MBC <:MBC:1389656225691734108>"]
-
 def format_summary_embed(guild_id):
     state = get_war_state(guild_id)
 
@@ -980,18 +1025,7 @@ def format_summary_embed(guild_id):
         summary += f"  T: **{draws}**"
     embed.add_field(name="Stats", value=summary, inline=False)
 
-    if state['results'] and state['war_active']: 
-        last_race = state['results'][-1]
-        rec = suggest_tracks(last_race['placements'])
-        random.shuffle(rec)
-        embed.add_field(
-            name="Suggested tracks",
-            value=" | ".join(rec),
-            inline=False
-        )
-        embed.set_footer(
-            text="Kiwi by marionee - 1.3.1",
-        )
+    embed.set_footer(text="Kiwi by marionee - 1.3.1",)
     return embed
 
 
